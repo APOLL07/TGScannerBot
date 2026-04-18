@@ -9,7 +9,7 @@ async def get_ip_info(ip: str) -> dict:
                 f"http://ip-api.com/json/{ip}",
                 params={"fields": "status,country,regionName,city,isp,org,as,proxy,hosting"},
             )
-            data = await resp.json()
+            data = resp.json()
             if data.get("status") == "success":
                 return {
                     "country": data.get("country", ""),

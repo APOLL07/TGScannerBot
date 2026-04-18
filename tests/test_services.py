@@ -1,6 +1,6 @@
 import re
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from services.token import generate_token
 from services.fingerprint import parse_user_agent
 from services.geo import get_ip_info
@@ -34,7 +34,7 @@ async def test_get_ip_info_localhost_returns_empty():
     assert await get_ip_info("127.0.0.1") == {}
 
 async def test_get_ip_info_success():
-    mock_resp = AsyncMock()
+    mock_resp = MagicMock()
     mock_resp.json.return_value = {
         "status": "success", "country": "Russia", "regionName": "Moscow",
         "city": "Moscow", "isp": "MTS", "org": "MTS PJSC",
