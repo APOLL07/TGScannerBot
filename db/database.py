@@ -47,13 +47,16 @@ async def create_session(
     tg_photo_url: Optional[str],
 ) -> None:
     async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(
-            """INSERT INTO sessions
-               (token, tg_id, tg_username, tg_first_name, tg_last_name, tg_lang, tg_photo_url)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (token, tg_id, tg_username, tg_first_name, tg_last_name, tg_lang, tg_photo_url),
-        )
-        await db.commit()
+        try:
+            await db.execute(
+                """INSERT INTO sessions
+                   (token, tg_id, tg_username, tg_first_name, tg_last_name, tg_lang, tg_photo_url)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (token, tg_id, tg_username, tg_first_name, tg_last_name, tg_lang, tg_photo_url),
+            )
+            await db.commit()
+        except aiosqlite.IntegrityError as e:
+            raise ValueError(f"Session with token '{token}' already exists") from e
 
 
 async def get_session(token: str) -> Optional[dict]:
@@ -68,7 +71,7 @@ async def update_consent(
     token: str, ip: str, user_agent: str, headers: dict, geo: dict,
 ) -> None:
     async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(
+        cursor = await db.execute(
             """UPDATE sessions SET
                ip = ?, user_agent = ?, headers = ?,
                geo_country = ?, geo_city = ?, geo_isp = ?, geo_proxy = ?,
@@ -81,6 +84,8 @@ async def update_consent(
                 token,
             ),
         )
+        if cursor.rowcount == 0:
+            raise ValueError(f"No session found for token: {token}")
         await db.commit()
 
 
@@ -89,7 +94,7 @@ async def update_client_data(
     fingerprint_hash: str, fingerprint_score: float,
 ) -> None:
     async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(
+        cursor = await db.execute(
             """UPDATE sessions SET
                screen_data = ?, webrtc_ips = ?,
                fingerprint_hash = ?, fingerprint_score = ?
@@ -99,6 +104,8 @@ async def update_client_data(
                 fingerprint_hash, fingerprint_score, token,
             ),
         )
+        if cursor.rowcount == 0:
+            raise ValueError(f"No session found for token: {token}")
         await db.commit()
 
 
