@@ -43,3 +43,16 @@ async def test_count_and_paginate_sessions():
     assert await count_user_sessions(200) == 7
     assert len(await get_user_sessions(200, limit=5, offset=0)) == 5
     assert len(await get_user_sessions(200, limit=5, offset=5)) == 2
+
+async def test_create_session_duplicate_token_raises():
+    await create_session("dup", 300, None, "Eve", None, "en", None)
+    with pytest.raises(ValueError, match="already exists"):
+        await create_session("dup", 300, None, "Eve", None, "en", None)
+
+async def test_update_consent_unknown_token_raises():
+    with pytest.raises(ValueError, match="No session found for token"):
+        await update_consent("ghost", "1.2.3.4", "ua", {}, {})
+
+async def test_update_client_data_unknown_token_raises():
+    with pytest.raises(ValueError, match="No session found for token"):
+        await update_client_data("ghost", {}, [], "h", 0.0)
