@@ -13,7 +13,7 @@ def parse_user_agent(ua_string: str) -> dict:
         "browser_version": browser.get("major") or "",
         "os": os_info.get("family") or "Unknown",
         "os_version": os_info.get("major") or "",
-        "device_type": "Mobile" if device_family not in ("Other", "") else "Desktop",
+        "device_type": "Mobile" if device_family not in ("Other", "") else "Desktop",  # tablets also classified as Mobile per spec
         "device_brand": device.get("brand") or "",
         "device_model": device.get("model") or "",
     }

@@ -6,7 +6,7 @@ async def get_ip_info(ip: str) -> dict:
     try:
         async with httpx.AsyncClient(timeout=5) as client:
             resp = await client.get(
-                f"http://ip-api.com/json/{ip}",
+                f"http://ip-api.com/json/{ip}",  # ip-api.com requires a paid plan for HTTPS; plain HTTP is intentional
                 params={"fields": "status,country,regionName,city,isp,org,as,proxy,hosting"},
             )
             data = resp.json()

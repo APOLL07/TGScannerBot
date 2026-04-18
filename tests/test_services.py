@@ -1,5 +1,4 @@
 import re
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from services.token import generate_token
 from services.fingerprint import parse_user_agent
@@ -51,3 +50,14 @@ async def test_get_ip_info_exception_returns_empty():
         MockClient.return_value.__aenter__.return_value.get = AsyncMock(side_effect=Exception("timeout"))
         result = await get_ip_info("1.2.3.4")
     assert result == {}
+
+async def test_get_ip_info_fail_status_returns_empty():
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {"status": "fail", "message": "invalid query"}
+    with patch("httpx.AsyncClient") as MockClient:
+        MockClient.return_value.__aenter__.return_value.get = AsyncMock(return_value=mock_resp)
+        result = await get_ip_info("999.999.999.999")
+    assert result == {}
+
+async def test_get_ip_info_ipv6_loopback_returns_empty():
+    assert await get_ip_info("::1") == {}
