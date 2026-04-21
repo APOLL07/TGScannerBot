@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TGScanner — Инициализация</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="consent-screen">
+    <div class="consent-box">
+      <h1 class="consent-title glitch" data-text="// TGSCANNER //">// TGSCANNER //</h1>
+
+      <div class="boot-lines">
+        <div class="boot-line ok">Инициализация сканирования</div>
+        <div class="boot-line ok">Модуль сбора данных загружен</div>
+        <div class="boot-line ok">Соединение с Telegram API</div>
+        <div class="boot-line ok">Анализ сетевых параметров</div>
+        <div class="boot-line">Ожидание подтверждения пользователя</div>
+      </div>
+
+      <p style="font-size:13px;color:#8090a0;margin-bottom:8px;">Будут собраны следующие данные:</p>
+      <ul class="data-list">
+        <li>Telegram ID, имя, @username, аватар</li>
+        <li>IP-адрес и геолокация</li>
+        <li>Браузер, операционная система, устройство</li>
+        <li>HTTP-заголовки запроса</li>
+        <li>Разрешение экрана и временная зона</li>
+        <li>Отпечаток браузера (Canvas + Audio API)</li>
+        <li>WebRTC утечки IP-адресов</li>
+      </ul>
+
+      <p class="consent-tos">
+        Продолжая, вы соглашаетесь с
+        <a href="/legal" target="_blank">Условиями использования</a>
+        данного сервиса и даёте согласие на сбор перечисленных данных.
+      </p>
+
+      <form method="POST" action="/scan/{{ token }}/consent">
+        <button type="submit" class="btn-accept">[ ПРИНЯТЬ И ПРОДОЛЖИТЬ ]</button>
+      </form>
+    </div>
+  </div>
+</body>
+</html>
