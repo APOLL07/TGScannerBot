@@ -39,6 +39,7 @@ async def init_db() -> None:
                 webrtc_ips TEXT,
                 fingerprint_hash TEXT,
                 fingerprint_score DOUBLE PRECISION,
+                os_hint TEXT,
                 consent_given INTEGER DEFAULT 0,
                 consent_at TEXT,
                 created_at TEXT DEFAULT (to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'))
@@ -98,16 +99,22 @@ async def update_consent(
 async def update_client_data(
     token: str, screen_data: dict, webrtc_ips: list,
     fingerprint_hash: str, fingerprint_score: float,
+    os_hint: str = "",
 ) -> None:
     pool = await get_pool()
     async with pool.acquire() as conn:
+        # Add column if it doesn't exist yet (for existing deployments)
+        await conn.execute(
+            "ALTER TABLE sessions ADD COLUMN IF NOT EXISTS os_hint TEXT"
+        )
         result = await conn.execute(
             """UPDATE sessions SET
                screen_data = $1, webrtc_ips = $2,
-               fingerprint_hash = $3, fingerprint_score = $4
-               WHERE token = $5""",
+               fingerprint_hash = $3, fingerprint_score = $4,
+               os_hint = $5
+               WHERE token = $6""",
             json.dumps(screen_data), json.dumps(webrtc_ips),
-            fingerprint_hash, fingerprint_score, token,
+            fingerprint_hash, fingerprint_score, os_hint or None, token,
         )
         if result == "UPDATE 0":
             raise ValueError(f"No session found for token: {token}")

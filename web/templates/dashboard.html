@@ -153,8 +153,8 @@
         </div>
         <div class="card">
           <div class="card-label">Операционная система</div>
-          <div class="card-value small">
-            {{ ua_info.os or '—' }}{% if ua_info.os_version %} {{ ua_info.os_version }}{% endif %}
+          <div class="card-value small" id="os-hint">
+            {{ session.os_hint or (ua_info.os ~ (' ' ~ ua_info.os_version if ua_info.os_version else '')) or '—' }}
           </div>
         </div>
         <div class="card">

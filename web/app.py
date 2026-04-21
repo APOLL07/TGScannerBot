@@ -130,6 +130,7 @@ def create_app() -> FastAPI:
             webrtc_ips=body.get("webrtc_ips", []),
             fingerprint_hash=body.get("fingerprint_hash", ""),
             fingerprint_score=float(body.get("fingerprint_score", 0)),
+            os_hint=body.get("os_hint", ""),
         )
         return JSONResponse({"ok": True})
 

@@ -32,6 +32,26 @@
     };
   }
 
+  // Returns a human-readable OS string using User-Agent Client Hints (CH),
+  // which is the only way to distinguish Windows 11 from Windows 10.
+  // Falls back to null if the browser doesn't support it (Firefox, Safari).
+  async function getOsHint() {
+    try {
+      if (!navigator.userAgentData) return null;
+      const data = await navigator.userAgentData.getHighEntropyValues(['platform', 'platformVersion']);
+      const platform = data.platform || '';
+      if (platform === 'Windows') {
+        // Windows 11 reports platformVersion >= 13.0.0; Windows 10 reports 0.x.x–12.x.x
+        const major = parseInt((data.platformVersion || '0').split('.')[0], 10);
+        return major >= 13 ? 'Windows 11' : 'Windows 10';
+      }
+      if (platform === 'macOS') return 'macOS ' + (data.platformVersion || '');
+      return platform ? platform + ' ' + (data.platformVersion || '') : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   function canvasFingerprint() {
     try {
       const canvas = document.createElement('canvas');
@@ -140,11 +160,17 @@
     setElText('timezone', screen.timezone || '\u2014');
     setElText('color-depth', screen.colorDepth + '-bit');
 
-    const [canvasHash, audioHash, ips] = await Promise.all([
+    const [canvasHash, audioHash, ips, osHint] = await Promise.all([
       Promise.resolve(canvasFingerprint()),
       audioFingerprint(),
       detectWebRTCLeaks(),
+      getOsHint(),
     ]);
+
+    // Update OS display immediately if Client Hints gave us a precise value
+    if (osHint) {
+      setElText('os-hint', osHint);
+    }
 
     if (ips.length === 0) {
       setEl('webrtc-result', '<span class="status-ok">\u0423\u0442\u0435\u0447\u0435\u043a \u043d\u0435 \u043e\u0431\u043d\u0430\u0440\u0443\u0436\u0435\u043d\u043e \u2713</span>');
@@ -169,6 +195,7 @@
           webrtc_ips: ips,
           fingerprint_hash: fpHash,
           fingerprint_score: score / 100,
+          os_hint: osHint || '',
         }),
       });
     } catch (e) {
