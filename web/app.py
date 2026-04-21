@@ -8,7 +8,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Resp
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from db.database import get_session, update_consent, update_client_data
+from db.database import get_session, update_consent, update_client_data, has_user_consented, grant_user_consent
 from services.fingerprint import parse_user_agent
 from services.geo import get_ip_info
 
@@ -19,8 +19,8 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 def get_real_ip(request: Request) -> str:
     forwarded = request.headers.get("X-Forwarded-For")
     if forwarded:
-        # Rightmost entry is added by the trusted reverse proxy; leftmost is user-controlled
-        return forwarded.split(",")[-1].strip()
+        # Leftmost entry is the original client IP (rightmost is the last trusted proxy)
+        return forwarded.split(",")[0].strip()
     return request.client.host if request.client else "unknown"
 
 
@@ -56,7 +56,16 @@ def create_app() -> FastAPI:
         session = await get_session(token)
         if not session:
             return HTMLResponse("<h1>404 — Ссылка недействительна</h1>", status_code=404)
+        # Already gave consent in this session
         if session["consent_given"]:
+            return RedirectResponse(f"/scan/{token}/dashboard")
+        # Gave consent in a previous session — auto-accept and skip the page
+        if await has_user_consented(session["tg_id"]):
+            ip = get_real_ip(request)
+            ua = request.headers.get("User-Agent", "")
+            headers = dict(request.headers)
+            geo = await get_ip_info(ip)
+            await update_consent(token, ip, ua, headers, geo)
             return RedirectResponse(f"/scan/{token}/dashboard")
         return templates.TemplateResponse("consent.html", {"request": request, "token": token})
 
@@ -70,6 +79,8 @@ def create_app() -> FastAPI:
         headers = dict(request.headers)
         geo = await get_ip_info(ip)
         await update_consent(token, ip, ua, headers, geo)
+        # Persist consent so future sessions skip this page
+        await grant_user_consent(session["tg_id"])
         return RedirectResponse(f"/scan/{token}/dashboard", status_code=303)
 
     @app.get("/scan/{token}/dashboard", response_class=HTMLResponse)

@@ -4,22 +4,23 @@ async def get_ip_info(ip: str) -> dict:
     if ip in ("127.0.0.1", "::1", "localhost"):
         return {}
     try:
+        # ip-api.com: free, accurate, supports proxy/hosting detection
+        # fields: status,country,regionName,city,isp,org,proxy,hosting
         async with httpx.AsyncClient(timeout=5) as client:
             resp = await client.get(
-                f"https://ipapi.co/{ip}/json/",
-                headers={"User-Agent": "TGScanner/1.0"},
+                f"http://ip-api.com/json/{ip}",
+                params={"fields": "status,country,regionName,city,isp,org,proxy,hosting"},
             )
             data = resp.json()
-            if not data.get("error"):
+            if data.get("status") == "success":
                 return {
-                    "country": data.get("country_name", ""),
-                    "region": data.get("region", ""),
+                    "country": data.get("country", ""),
+                    "region": data.get("regionName", ""),
                     "city": data.get("city", ""),
-                    "isp": data.get("org", ""),
+                    "isp": data.get("isp", "") or data.get("org", ""),
                     "org": data.get("org", ""),
-                    "asn": data.get("asn", ""),
-                    "proxy": False,   # ipapi.co free tier does not provide proxy detection
-                    "hosting": False,
+                    "proxy": bool(data.get("proxy") or data.get("hosting")),
+                    "hosting": bool(data.get("hosting")),
                 }
     except Exception:
         pass

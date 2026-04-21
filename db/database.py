@@ -45,6 +45,13 @@ async def init_db() -> None:
                 created_at TEXT DEFAULT (to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'))
             )
         """)
+        # Permanent consent table — one row per Telegram user
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS user_consents (
+                tg_id BIGINT PRIMARY KEY,
+                consented_at TEXT NOT NULL
+            )
+        """)
 
 
 async def create_session(
@@ -74,6 +81,28 @@ async def get_session(token: str) -> Optional[dict]:
     async with pool.acquire() as conn:
         row = await conn.fetchrow("SELECT * FROM sessions WHERE token = $1", token)
         return dict(row) if row else None
+
+
+async def has_user_consented(tg_id: int) -> bool:
+    """Returns True if this Telegram user has ever accepted the consent."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT 1 FROM user_consents WHERE tg_id = $1", tg_id
+        )
+        return row is not None
+
+
+async def grant_user_consent(tg_id: int) -> None:
+    """Record permanent consent for a Telegram user (upsert)."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            """INSERT INTO user_consents (tg_id, consented_at)
+               VALUES ($1, to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'))
+               ON CONFLICT (tg_id) DO NOTHING""",
+            tg_id,
+        )
 
 
 async def update_consent(
