@@ -7,21 +7,69 @@
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <div class="dashboard">
-    <h1 class="dashboard-title glitch" data-text="// SCAN RESULTS //">// SCAN RESULTS //</h1>
 
-    <div class="tabs">
-      <button class="tab-btn active" onclick="switchTab('profile')">[ ПРОФИЛЬ ]</button>
-      <button class="tab-btn" onclick="switchTab('network')">[ СЕТЬ ]</button>
-      <button class="tab-btn" onclick="switchTab('device')">[ УСТРОЙСТВО ]</button>
-      <button class="tab-btn" onclick="switchTab('headers')">[ ЗАГОЛОВКИ ]</button>
+  <!-- ── STATUS BAR ─────────────────────────────────────── -->
+  <div class="statusbar">
+    <div class="statusbar-left">
+      <span><span class="status-dot"></span><span class="status-live">SYSTEM ONLINE</span></span>
+      <span>TOKEN: {{ token[:8] if token else '--------' }}…</span>
+      <span>PROTO: HTTPS/2</span>
+    </div>
+    <div class="statusbar-right">
+      {% if session.geo_proxy %}
+        <span class="status-warn">⚠ VPN / PROXY DETECTED</span>
+      {% endif %}
+      <span id="sb-time"></span>
+    </div>
+  </div>
+
+  <div class="dashboard">
+
+    <!-- ── PAGE HEADER ────────────────────────────────────── -->
+    <div class="page-header">
+      <div class="header-left">
+        <div class="scan-label">TGScanner · Threat Intelligence</div>
+        <h1 class="dashboard-title">SCAN <span>RESULTS</span></h1>
+      </div>
+
+      <div class="threat-level">
+        <div class="threat-label">Risk Level</div>
+        {% if session.geo_proxy %}
+          <div class="threat-badge medium">MEDIUM</div>
+        {% else %}
+          <div class="threat-badge low">LOW</div>
+        {% endif %}
+      </div>
+
+      <!-- decorative radar rings -->
+      <svg class="pulse-ring" viewBox="0 0 120 120" aria-hidden="true">
+        <circle class="r1" cx="60" cy="60"/>
+        <circle class="r2" cx="60" cy="60"/>
+        <circle class="r3" cx="60" cy="60"/>
+      </svg>
     </div>
 
-    <!-- ПРОФИЛЬ -->
+    <!-- ── SCAN PROGRESS BAR ──────────────────────────────── -->
+    <div class="scan-bar-wrap">
+      <span class="scan-bar-label">Анализ данных</span>
+      <div class="scan-bar"><div class="scan-bar-fill"></div></div>
+      <span class="scan-bar-pct">ACTIVE</span>
+    </div>
+
+    <!-- ── TABS ───────────────────────────────────────────── -->
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('profile', this)">[ ПРОФИЛЬ ]</button>
+      <button class="tab-btn" onclick="switchTab('network', this)">[ СЕТЬ ]</button>
+      <button class="tab-btn" onclick="switchTab('device', this)">[ УСТРОЙСТВО ]</button>
+      <button class="tab-btn" onclick="switchTab('headers', this)">[ ЗАГОЛОВКИ ]</button>
+    </div>
+
+    <!-- ── ПРОФИЛЬ ────────────────────────────────────────── -->
     <div id="tab-profile" class="tab-panel active">
+
       <div class="profile-header">
         {% if session.tg_photo_url %}
-          <img class="avatar" src="{{ session.tg_photo_url }}" alt="avatar">
+          <img class="avatar" src="/photo/{{ token }}" alt="avatar">
         {% else %}
           <div class="avatar-placeholder">👤</div>
         {% endif %}
@@ -32,14 +80,14 @@
           {% if session.tg_username %}
             <div class="profile-username">@{{ session.tg_username }}</div>
           {% endif %}
-          <span class="badge">✓ VERIFIED SCAN</span>
+          <span class="badge">VERIFIED SCAN</span>
         </div>
       </div>
 
       <div class="grid-2">
         <div class="card">
           <div class="card-label">Telegram ID</div>
-          <div class="card-value small">{{ session.tg_id or '—' }}</div>
+          <div class="card-value cyan small">{{ session.tg_id or '—' }}</div>
         </div>
         <div class="card">
           <div class="card-label">Username</div>
@@ -54,13 +102,15 @@
           <div class="card-value small">{{ session.created_at or '—' }}</div>
         </div>
       </div>
+
     </div>
 
-    <!-- СЕТЬ -->
+    <!-- ── СЕТЬ ───────────────────────────────────────────── -->
     <div id="tab-network" class="tab-panel">
+
       <div class="card" style="margin-bottom:12px;">
         <div class="card-label">IP-адрес</div>
-        <div class="card-value pink">{{ session.ip or '—' }}</div>
+        <div class="card-value amber">{{ session.ip or '—' }}</div>
       </div>
 
       <div class="grid-2">
@@ -78,7 +128,7 @@
         </div>
         <div class="card">
           <div class="card-label">VPN / Proxy</div>
-          <div class="card-value small {% if session.geo_proxy %}pink{% endif %}">
+          <div class="card-value small {% if session.geo_proxy %}red{% endif %}">
             {{ 'Обнаружен ⚠' if session.geo_proxy else 'Не обнаружен ✓' }}
           </div>
         </div>
@@ -86,20 +136,26 @@
 
       <div class="card">
         <div class="card-label">WebRTC утечка IP</div>
-        <div class="card-value small collecting" id="webrtc-result"></div>
+        <div class="card-value small cyan collecting" id="webrtc-result"></div>
       </div>
+
     </div>
 
-    <!-- УСТРОЙСТВО -->
+    <!-- ── УСТРОЙСТВО ─────────────────────────────────────── -->
     <div id="tab-device" class="tab-panel">
+
       <div class="grid-2">
         <div class="card">
           <div class="card-label">Браузер</div>
-          <div class="card-value small">{{ ua_info.browser or '—' }}{% if ua_info.browser_version %} {{ ua_info.browser_version }}{% endif %}</div>
+          <div class="card-value small">
+            {{ ua_info.browser or '—' }}{% if ua_info.browser_version %} {{ ua_info.browser_version }}{% endif %}
+          </div>
         </div>
         <div class="card">
           <div class="card-label">Операционная система</div>
-          <div class="card-value small">{{ ua_info.os or '—' }}{% if ua_info.os_version %} {{ ua_info.os_version }}{% endif %}</div>
+          <div class="card-value small">
+            {{ ua_info.os or '—' }}{% if ua_info.os_version %} {{ ua_info.os_version }}{% endif %}
+          </div>
         </div>
         <div class="card">
           <div class="card-label">Тип устройства</div>
@@ -121,15 +177,16 @@
 
       <div class="card">
         <div class="card-label">Отпечаток браузера</div>
-        <div class="card-value small collecting" id="fp-hash"></div>
+        <div class="card-value small cyan collecting" id="fp-hash"></div>
       </div>
       <div class="card">
         <div class="card-label">Уникальность отпечатка</div>
         <div class="card-value small collecting" id="fp-score"></div>
       </div>
+
     </div>
 
-    <!-- ЗАГОЛОВКИ -->
+    <!-- ── ЗАГОЛОВКИ ──────────────────────────────────────── -->
     <div id="tab-headers" class="tab-panel">
       {% if headers_raw %}
         <div class="card" style="padding:0;overflow:auto;">
@@ -152,22 +209,44 @@
         </div>
       {% else %}
         <div class="card">
-          <span style="color:var(--muted);font-size:13px;">Заголовки не получены</span>
+          <span style="color:var(--muted);font-size:13px;font-family:'JetBrains Mono',monospace;">
+            Заголовки не получены
+          </span>
         </div>
       {% endif %}
     </div>
-  </div>
+
+  </div><!-- /dashboard -->
 
   <script>
     const SCAN_TOKEN = "{{ token }}";
 
-    function switchTab(name) {
+    // Tab switcher
+    function switchTab(name, btn) {
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       document.getElementById('tab-' + name).classList.add('active');
-      event.currentTarget.classList.add('active');
+      btn.classList.add('active');
     }
+
+    // Live clock in status bar
+    function updateClock() {
+      const el = document.getElementById('sb-time');
+      if (!el) return;
+      const now = new Date();
+      const pad = n => String(n).padStart(2, '0');
+      el.textContent =
+        now.getUTCFullYear() + '-' +
+        pad(now.getUTCMonth() + 1) + '-' +
+        pad(now.getUTCDate()) + ' · ' +
+        pad(now.getUTCHours()) + ':' +
+        pad(now.getUTCMinutes()) + ':' +
+        pad(now.getUTCSeconds()) + ' UTC';
+    }
+    updateClock();
+    setInterval(updateClock, 1000);
   </script>
   <script src="/static/scanner.js"></script>
+
 </body>
 </html>

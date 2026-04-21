@@ -12,3 +12,14 @@ dist/
 ngrok.exe
 .graphify_*
 graphify-out/
+
+# Design previews and local drafts
+design_preview*.html
+*.draft.html
+
+# OS/IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

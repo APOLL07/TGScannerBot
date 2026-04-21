@@ -2,8 +2,9 @@ import json
 import os
 from pathlib import Path
 
+import httpx
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -18,13 +19,33 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 def get_real_ip(request: Request) -> str:
     forwarded = request.headers.get("X-Forwarded-For")
     if forwarded:
-        return forwarded.split(",")[0].strip()
+        # Rightmost entry is added by the trusted reverse proxy; leftmost is user-controlled
+        return forwarded.split(",")[-1].strip()
     return request.client.host if request.client else "unknown"
 
 
 def create_app() -> FastAPI:
     app = FastAPI(docs_url=None, redoc_url=None)
     app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
+
+    @app.get("/photo/{token}")
+    async def serve_photo(token: str):
+        session = await get_session(token)
+        if not session or not session.get("tg_photo_url"):
+            return Response(status_code=404)
+        bot_token = os.environ.get("BOT_TOKEN", "")
+        url = f"https://api.telegram.org/file/bot{bot_token}/{session['tg_photo_url']}"
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.get(url)
+                if resp.status_code != 200:
+                    return Response(status_code=404)
+                return Response(
+                    content=resp.content,
+                    media_type=resp.headers.get("content-type", "image/jpeg"),
+                )
+        except Exception:
+            return Response(status_code=502)
 
     @app.get("/legal", response_class=HTMLResponse)
     async def legal(request: Request):
@@ -97,6 +118,8 @@ def create_app() -> FastAPI:
 
     @app.post("/scan/{token}/client")
     async def receive_client_data(request: Request, token: str):
+        if int(request.headers.get("content-length", 0)) > 64 * 1024:
+            return JSONResponse({"error": "payload too large"}, status_code=413)
         session = await get_session(token)
         if not session or not session["consent_given"]:
             return JSONResponse({"error": "forbidden"}, status_code=403)

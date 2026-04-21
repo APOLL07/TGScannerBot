@@ -9,7 +9,9 @@
 <body>
   <div class="consent-screen">
     <div class="consent-box">
-      <h1 class="consent-title glitch" data-text="// TGSCANNER //">// TGSCANNER //</h1>
+
+      <div class="consent-label">TGScanner · Threat Intelligence</div>
+      <h1 class="consent-title">SCAN <span>INIT</span></h1>
 
       <div class="boot-lines">
         <div class="boot-line ok">Инициализация сканирования</div>
@@ -19,7 +21,9 @@
         <div class="boot-line">Ожидание подтверждения пользователя</div>
       </div>
 
-      <p style="font-size:13px;color:#8090a0;margin-bottom:8px;">Будут собраны следующие данные:</p>
+      <p style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);margin-bottom:8px;letter-spacing:1px;text-transform:uppercase;">
+        Будут собраны следующие данные:
+      </p>
       <ul class="data-list">
         <li>Telegram ID, имя, @username, аватар</li>
         <li>IP-адрес и геолокация</li>
@@ -37,8 +41,11 @@
       </p>
 
       <form method="POST" action="/scan/{{ token }}/consent">
-        <button type="submit" class="btn-accept">[ ПРИНЯТЬ И ПРОДОЛЖИТЬ ]</button>
+        <button type="submit" class="btn-accept">
+          <span>[ ПРИНЯТЬ И ПРОДОЛЖИТЬ ]</span>
+        </button>
       </form>
+
     </div>
   </div>
 </body>

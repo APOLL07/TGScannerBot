@@ -1,18 +1,28 @@
-import aiosqlite
+import asyncpg
 import json
 import os
 from typing import Optional
 
-DB_PATH = os.getenv("DB_PATH", "sessions.db")
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+_pool: Optional[asyncpg.Pool] = None
+
+
+async def get_pool() -> asyncpg.Pool:
+    global _pool
+    if _pool is None:
+        _pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=10)
+    return _pool
 
 
 async def init_db() -> None:
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute("""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute("""
             CREATE TABLE IF NOT EXISTS sessions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id BIGSERIAL PRIMARY KEY,
                 token TEXT UNIQUE NOT NULL,
-                tg_id INTEGER NOT NULL,
+                tg_id BIGINT NOT NULL,
                 tg_username TEXT,
                 tg_first_name TEXT NOT NULL,
                 tg_last_name TEXT,
@@ -28,13 +38,12 @@ async def init_db() -> None:
                 screen_data TEXT,
                 webrtc_ips TEXT,
                 fingerprint_hash TEXT,
-                fingerprint_score REAL,
+                fingerprint_score DOUBLE PRECISION,
                 consent_given INTEGER DEFAULT 0,
                 consent_at TEXT,
-                created_at TEXT DEFAULT (datetime('now'))
+                created_at TEXT DEFAULT (to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'))
             )
         """)
-        await db.commit()
 
 
 async def create_session(
@@ -46,83 +55,78 @@ async def create_session(
     tg_lang: Optional[str],
     tg_photo_url: Optional[str],
 ) -> None:
-    async with aiosqlite.connect(DB_PATH) as db:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
         try:
-            await db.execute(
+            await conn.execute(
                 """INSERT INTO sessions
                    (token, tg_id, tg_username, tg_first_name, tg_last_name, tg_lang, tg_photo_url)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                (token, tg_id, tg_username, tg_first_name, tg_last_name, tg_lang, tg_photo_url),
+                   VALUES ($1, $2, $3, $4, $5, $6, $7)""",
+                token, tg_id, tg_username, tg_first_name, tg_last_name, tg_lang, tg_photo_url,
             )
-            await db.commit()
-        except aiosqlite.IntegrityError as e:
+        except asyncpg.UniqueViolationError as e:
             raise ValueError(f"Session with token '{token}' already exists") from e
 
 
 async def get_session(token: str) -> Optional[dict]:
-    async with aiosqlite.connect(DB_PATH) as db:
-        db.row_factory = aiosqlite.Row
-        async with db.execute("SELECT * FROM sessions WHERE token = ?", (token,)) as cursor:
-            row = await cursor.fetchone()
-            return dict(row) if row else None
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow("SELECT * FROM sessions WHERE token = $1", token)
+        return dict(row) if row else None
 
 
 async def update_consent(
     token: str, ip: str, user_agent: str, headers: dict, geo: dict,
 ) -> None:
-    async with aiosqlite.connect(DB_PATH) as db:
-        cursor = await db.execute(
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        result = await conn.execute(
             """UPDATE sessions SET
-               ip = ?, user_agent = ?, headers = ?,
-               geo_country = ?, geo_city = ?, geo_isp = ?, geo_proxy = ?,
-               consent_given = 1, consent_at = datetime('now')
-               WHERE token = ?""",
-            (
-                ip, user_agent, json.dumps(headers),
-                geo.get("country"), geo.get("city"), geo.get("isp"),
-                1 if geo.get("proxy") else 0,
-                token,
-            ),
+               ip = $1, user_agent = $2, headers = $3,
+               geo_country = $4, geo_city = $5, geo_isp = $6, geo_proxy = $7,
+               consent_given = 1, consent_at = to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+               WHERE token = $8""",
+            ip, user_agent, json.dumps(headers),
+            geo.get("country"), geo.get("city"), geo.get("isp"),
+            1 if geo.get("proxy") else 0,
+            token,
         )
-        if cursor.rowcount == 0:
+        if result == "UPDATE 0":
             raise ValueError(f"No session found for token: {token}")
-        await db.commit()
 
 
 async def update_client_data(
     token: str, screen_data: dict, webrtc_ips: list,
     fingerprint_hash: str, fingerprint_score: float,
 ) -> None:
-    async with aiosqlite.connect(DB_PATH) as db:
-        cursor = await db.execute(
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        result = await conn.execute(
             """UPDATE sessions SET
-               screen_data = ?, webrtc_ips = ?,
-               fingerprint_hash = ?, fingerprint_score = ?
-               WHERE token = ?""",
-            (
-                json.dumps(screen_data), json.dumps(webrtc_ips),
-                fingerprint_hash, fingerprint_score, token,
-            ),
+               screen_data = $1, webrtc_ips = $2,
+               fingerprint_hash = $3, fingerprint_score = $4
+               WHERE token = $5""",
+            json.dumps(screen_data), json.dumps(webrtc_ips),
+            fingerprint_hash, fingerprint_score, token,
         )
-        if cursor.rowcount == 0:
+        if result == "UPDATE 0":
             raise ValueError(f"No session found for token: {token}")
-        await db.commit()
 
 
 async def get_user_sessions(tg_id: int, limit: int = 5, offset: int = 0) -> list:
-    async with aiosqlite.connect(DB_PATH) as db:
-        db.row_factory = aiosqlite.Row
-        async with db.execute(
-            "SELECT * FROM sessions WHERE tg_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
-            (tg_id, limit, offset),
-        ) as cursor:
-            return [dict(row) for row in await cursor.fetchall()]
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT * FROM sessions WHERE tg_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
+            tg_id, limit, offset,
+        )
+        return [dict(row) for row in rows]
 
 
 async def count_user_sessions(tg_id: int) -> int:
-    async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute(
-            "SELECT COUNT(*) FROM sessions WHERE tg_id = ?", (tg_id,)
-        ) as cursor:
-            row = await cursor.fetchone()
-            return row[0] if row else 0
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT COUNT(*) FROM sessions WHERE tg_id = $1", tg_id
+        )
+        return row[0] if row else 0

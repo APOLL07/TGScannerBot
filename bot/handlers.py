@@ -24,7 +24,7 @@ async def _get_photo_url(bot: Bot, user_id: int) -> Optional[str]:
             return None
         file_id = photos.photos[0][-1].file_id
         file = await bot.get_file(file_id)
-        return f"https://api.telegram.org/file/bot{bot.token}/{file.file_path}"
+        return file.file_path
     except Exception:
         return None
 

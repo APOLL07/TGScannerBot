@@ -7,6 +7,11 @@
     if (el) el.innerHTML = html;
   }
 
+  function setElText(id, text) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+  }
+
   function collectScreen() {
     return {
       width: window.screen.width,
@@ -131,9 +136,9 @@
   async function run() {
     const screen = collectScreen();
 
-    setEl('screen-res', screen.width + ' \u00d7 ' + screen.height + ' (\u00d7' + screen.pixelRatio + ')');
-    setEl('timezone', screen.timezone || '\u2014');
-    setEl('color-depth', screen.colorDepth + '-bit');
+    setElText('screen-res', screen.width + ' \u00d7 ' + screen.height + ' (\u00d7' + screen.pixelRatio + ')');
+    setElText('timezone', screen.timezone || '\u2014');
+    setElText('color-depth', screen.colorDepth + '-bit');
 
     const [canvasHash, audioHash, ips] = await Promise.all([
       Promise.resolve(canvasFingerprint()),
