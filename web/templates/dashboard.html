@@ -147,8 +147,8 @@
       <div class="grid-2">
         <div class="card">
           <div class="card-label">Браузер</div>
-          <div class="card-value small">
-            {{ ua_info.browser or '—' }}{% if ua_info.browser_version %} {{ ua_info.browser_version }}{% endif %}
+          <div class="card-value small" id="browser-hint">
+            {{ session.browser_hint or (ua_info.browser ~ (' ' ~ ua_info.browser_version if ua_info.browser_version else '')) or '—' }}
           </div>
         </div>
         <div class="card">
@@ -219,7 +219,7 @@
   </div><!-- /dashboard -->
 
   <script>
-    const SCAN_TOKEN = "{{ token }}";
+    window.SCAN_TOKEN = "{{ token }}";
 
     // Tab switcher
     function switchTab(name, btn) {

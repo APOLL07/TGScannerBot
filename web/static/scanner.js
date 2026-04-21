@@ -34,22 +34,50 @@
 
   // Returns a human-readable OS string using User-Agent Client Hints (CH),
   // which is the only way to distinguish Windows 11 from Windows 10.
-  // Falls back to null if the browser doesn't support it (Firefox, Safari).
-  async function getOsHint() {
+  // Brave is Chromium-based and supports userAgentData.
+  async function getClientHints() {
+    const result = { osHint: null, browserHint: null };
     try {
-      if (!navigator.userAgentData) return null;
-      const data = await navigator.userAgentData.getHighEntropyValues(['platform', 'platformVersion']);
+      // --- Brave detection (must be async) ---
+      if (navigator.brave && typeof navigator.brave.isBrave === 'function') {
+        const isBrave = await navigator.brave.isBrave();
+        if (isBrave) {
+          result.browserHint = 'Brave';
+        }
+      }
+
+      // --- OS via Client Hints ---
+      if (!navigator.userAgentData) return result;
+      const data = await navigator.userAgentData.getHighEntropyValues(
+        ['platform', 'platformVersion', 'fullVersionList']
+      );
       const platform = data.platform || '';
+
       if (platform === 'Windows') {
         // Windows 11 reports platformVersion >= 13.0.0; Windows 10 reports 0.x.x–12.x.x
         const major = parseInt((data.platformVersion || '0').split('.')[0], 10);
-        return major >= 13 ? 'Windows 11' : 'Windows 10';
+        result.osHint = major >= 13 ? 'Windows 11' : 'Windows 10';
+      } else if (platform === 'macOS') {
+        result.osHint = 'macOS ' + (data.platformVersion || '');
+      } else if (platform) {
+        result.osHint = platform + (data.platformVersion ? ' ' + data.platformVersion : '');
       }
-      if (platform === 'macOS') return 'macOS ' + (data.platformVersion || '');
-      return platform ? platform + ' ' + (data.platformVersion || '') : null;
+
+      // --- Browser version from fullVersionList (overrides UA parser) ---
+      if (!result.browserHint && data.fullVersionList && data.fullVersionList.length) {
+        // fullVersionList example: [{brand:'Chromium',version:'...'},{brand:'Google Chrome',version:'...'}]
+        const preferred = data.fullVersionList.find(
+          e => !e.brand.includes('Not') && !e.brand.includes('Brand')
+        );
+        if (preferred) {
+          const major = preferred.version.split('.')[0];
+          result.browserHint = preferred.brand + ' ' + major;
+        }
+      }
     } catch (e) {
-      return null;
+      // Client Hints unavailable
     }
+    return result;
   }
 
   function canvasFingerprint() {
@@ -160,16 +188,20 @@
     setElText('timezone', screen.timezone || '\u2014');
     setElText('color-depth', screen.colorDepth + '-bit');
 
-    const [canvasHash, audioHash, ips, osHint] = await Promise.all([
+    const [canvasHash, audioHash, ips, hints] = await Promise.all([
       Promise.resolve(canvasFingerprint()),
       audioFingerprint(),
       detectWebRTCLeaks(),
-      getOsHint(),
+      getClientHints(),
     ]);
 
-    // Update OS display immediately if Client Hints gave us a precise value
-    if (osHint) {
-      setElText('os-hint', osHint);
+    // Override OS display if Client Hints gave us a precise value
+    if (hints.osHint) {
+      setElText('os-hint', hints.osHint);
+    }
+    // Override browser display (Brave or exact version from fullVersionList)
+    if (hints.browserHint) {
+      setElText('browser-hint', hints.browserHint);
     }
 
     if (ips.length === 0) {
@@ -195,11 +227,12 @@
           webrtc_ips: ips,
           fingerprint_hash: fpHash,
           fingerprint_score: score / 100,
-          os_hint: osHint || '',
+          os_hint: hints.osHint || '',
+          browser_hint: hints.browserHint || '',
         }),
       });
     } catch (e) {
-      // network error — don't break UI
+      // network error \u2014 don't break UI
     }
   }
 
