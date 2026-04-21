@@ -13,7 +13,9 @@ from services.fingerprint import parse_user_agent
 from services.token import generate_token
 
 router = Router()
-BASE_URL = os.environ.get("BASE_URL", "http://localhost:8000")
+railway_domain = os.environ.get("RAILWAY_PUBLIC_DOMAIN")
+default_url = f"https://{railway_domain}" if railway_domain else "http://localhost:8000"
+BASE_URL = os.environ.get("BASE_URL", default_url)
 PAGE_SIZE = 5
 
 
