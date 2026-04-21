@@ -23,6 +23,7 @@ async def main() -> None:
     await init_db()
 
     bot = Bot(token=token)
+    await bot.delete_webhook(drop_pending_updates=True)
     dp = create_dispatcher()
     app = create_app()
 
