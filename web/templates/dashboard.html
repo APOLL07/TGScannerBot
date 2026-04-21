@@ -220,6 +220,7 @@
 
   <script>
     window.SCAN_TOKEN = "{{ token }}";
+    window.KNOWN_IP = "{{ session.ip or '' }}";
 
     // Tab switcher
     function switchTab(name, btn) {

@@ -205,9 +205,18 @@
     }
 
     if (ips.length === 0) {
-      setEl('webrtc-result', '<span class="status-ok">\u0423\u0442\u0435\u0447\u0435\u043a \u043d\u0435 \u043e\u0431\u043d\u0430\u0440\u0443\u0436\u0435\u043d\u043e \u2713</span>');
+      setEl('webrtc-result', '<span class="status-ok">\u0423\u0442\u0435\u0447\u0435\u043a \u043d\u0435 \u043e\u0431\u043d\u0430\u0440\u0443\u0436\u0435\u043d \u2713</span>');
     } else {
-      setEl('webrtc-result', '<span class="status-warn">\u26a0 \u041e\u0431\u043d\u0430\u0440\u0443\u0436\u0435\u043d\u044b IP: ' + ips.join(', ') + '</span>');
+      const knownIp = (window.KNOWN_IP || '').trim();
+      // A real leak = WebRTC reveals IPs *different* from the already-known IP
+      const leakedIps = ips.filter(function(ip) { return ip !== knownIp; });
+      if (leakedIps.length === 0) {
+        // WebRTC only exposed the same IP — not a leak, just normal behaviour
+        setEl('webrtc-result', '<span class="status-ok">\u0423\u0442\u0435\u0447\u043a\u0430 \u043d\u0435\u0442 \u2014 WebRTC \u043f\u043e\u043a\u0430\u0437\u044b\u0432\u0430\u0435\u0442 \u0442\u043e\u0442 \u0436\u0435 IP \u2713</span>');
+      } else {
+        // WebRTC reveals an IP different from the known one — actual leak (e.g. VPN bypass)
+        setEl('webrtc-result', '<span class="status-warn">\u26a0 \u0423\u0442\u0435\u0447\u043a\u0430! \u0420\u0435\u0430\u043b\u044c\u043d\u044b\u0439 IP: ' + leakedIps.join(', ') + '</span>');
+      }
     }
 
     const fpRaw = canvasHash + '|' + audioHash + '|' + screen.width + '|' + screen.height + '|' + screen.colorDepth + '|' + screen.timezone;
